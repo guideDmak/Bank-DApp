@@ -76,11 +76,25 @@ async function refreshBalances() {
   ]);
   if (activeAccount !== account) return;
   el("bankBalance").textContent = formatEth(deposited);
-  el("walletBalance").textContent = formatEth(wallet);
+  el("bankBalance").title = ethers.formatEther(deposited) + " ETH";
+  el("walletBalance").textContent = formatWalletEth(wallet);
+  el("walletBalance").title = ethers.formatEther(wallet) + " ETH (ยอดเต็ม)";
 }
 function formatEth(amountWei) {
   const eth = ethers.formatEther(amountWei);
   return eth.includes(".") ? eth.replace(/0+$/, "").replace(/\.$/, "") : eth;
+}
+/** Keep the wallet overview legible, without losing the exact amount (shown on hover). */
+function formatWalletEth(amountWei) {
+  const exact = formatEth(amountWei);
+  const [whole, fraction = ""] = exact.split(".");
+  const precision = 6;
+  if (fraction.length <= precision) return exact;
+  const visible = fraction.slice(0, precision);
+  if (whole === "0" && /^0+$/.test(visible) && amountWei > 0n) {
+    return "< 0.000001";
+  }
+  return "≈ " + whole + "." + visible;
 }
 async function connectWallet(requestAccounts = true) {
   if (!window.ethereum) {
