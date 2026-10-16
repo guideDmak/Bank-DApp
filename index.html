@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101321">
+  <meta name="description" content="Sepolia Bank DApp — ทดลองฝาก ถอน และตรวจสอบยอดเงินผ่าน Smart Contract บน Sepolia Testnet">
+  <title>Sepolia Bank — Assignment 5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.14.0/dist/ethers.umd.min.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="orb orb-one" aria-hidden="true"></div>
+  <div class="orb orb-two" aria-hidden="true"></div>
+
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Sepolia Bank หน้าหลัก">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-text"><strong>Sepolia<span>Bank</span></strong><small>DECENTRALIZED BANKING</small></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="network-pill"><span class="dot"></span> Sepolia Testnet</span>
+        <button type="button" class="btn btn-connect" id="connectButton">
+          <span class="wallet-icon" aria-hidden="true">◈</span>
+          <span id="connectButtonText">เชื่อมต่อ MetaMask</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="pageTitle">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="eyebrow-line"></span> BLOCKCHAIN ASSIGNMENT / 05</span>
+          <h1 id="pageTitle">Your wallet.<br><em>Your bank.</em></h1>
+          <p>ทดลองใช้งานระบบธนาคารบน Blockchain ฝากเงิน ถอนเงิน และตรวจสอบยอดคงเหลือผ่าน Smart Contract บนเครือข่าย Sepolia</p>
+          <div class="hero-chips">
+            <span><span class="chip-dot green"></span> Ethereum Testnet</span>
+            <span><span class="chip-dot purple"></span> Powered by Smart Contract</span>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-halo"></div>
+          <div class="art-card">
+            <div class="art-card-top"><span>SB / WEB3 BANKING</span><span class="art-chip"></span></div>
+            <div class="art-circles"><i></i><i></i></div>
+            <div class="art-card-bottom"><span>SEPOLIA NETWORK</span><strong>◈</strong></div>
+          </div>
+          <span class="art-star star-a">✦</span><span class="art-star star-b">✳</span>
+        </div>
+      </section>
+
+      <section class="connection-bar" aria-label="สถานะการเชื่อมต่อ">
+        <div class="connection-primary">
+          <span class="connection-dot" id="connectionDot"></span>
+          <div>
+            <strong id="connectionStatus">ยังไม่ได้เชื่อมต่อกระเป๋าเงิน</strong>
+            <small id="walletAddress">กดเชื่อมต่อ MetaMask เพื่อเริ่มต้นใช้งาน</small>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline hidden" id="switchNetworkButton">เปลี่ยนเป็น Sepolia ↗</button>
+        <span class="connection-chain" id="networkStatus">NETWORK · —</span>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="overviewHeading">
+        <div class="section-heading">
+          <div><span class="section-kicker">OVERVIEW</span><h2 id="overviewHeading">ภาพรวมบัญชี</h2></div>
+          <button type="button" class="text-button" id="refreshButton" disabled>↻ รีเฟรชยอดเงิน</button>
+        </div>
+        <div class="balance-grid">
+          <article class="balance-card balance-card-primary">
+            <div class="card-heading"><span class="card-icon icon-violet">▤</span><span>ยอดฝากใน Bank Contract</span></div>
+            <div class="balance-row"><strong id="bankBalance">—</strong><span>ETH</span></div>
+            <p>ยอดเงินที่ฝากไว้ใน Smart Contract ของกระเป๋านี้</p>
+            <div class="card-decoration" aria-hidden="true"></div>
+          </article>
+          <article class="balance-card">
+            <div class="card-heading"><span class="card-icon icon-mint">◇</span><span>ยอดเงินใน MetaMask</span></div>
+            <div class="balance-row"><strong id="walletBalance">—</strong><span>ETH</span></div>
+            <p>ยอด Sepolia ETH ในกระเป๋า (ใช้เป็นค่าธรรมเนียม Gas ด้วย)</p>
+            <span class="balance-label">TESTNET ASSETS ONLY</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section" aria-labelledby="actionsHeading">
+        <div class="section-heading">
+          <div><span class="section-kicker">TRANSACTIONS</span><h2 id="actionsHeading">ทำรายการ</h2></div>
+          <span class="muted-label">จำนวนเงินในหน่วย ETH</span>
+        </div>
+        <div class="action-grid">
+          <article class="action-card">
+            <div class="action-header"><span class="action-icon deposit-icon" aria-hidden="true">↓</span><div><h3>ฝากเงิน</h3><p>Deposit ETH to contract</p></div></div>
+            <form id="depositForm">
+              <label for="depositAmount">จำนวนที่ต้องการฝาก</label>
+              <div class="input-wrap"><input id="depositAmount" type="text" inputmode="decimal" placeholder="0.0001" autocomplete="off" aria-describedby="depositHint" required><span>ETH</span></div>
+              <small id="depositHint">ฝาก Sepolia ETH เท่านั้น · ไม่มีขั้นต่ำที่กำหนดโดยหน้าเว็บ</small>
+              <button type="submit" id="depositButton" class="btn btn-action btn-deposit" disabled>ฝากเงิน <span aria-hidden="true">↗</span></button>
+            </form>
+          </article>
+          <article class="action-card">
+            <div class="action-header"><span class="action-icon withdraw-icon" aria-hidden="true">↑</span><div><h3>ถอนเงิน</h3><p>Withdraw ETH from contract</p></div></div>
+            <form id="withdrawForm">
+              <label for="withdrawAmount">จำนวนที่ต้องการถอน</label>
+              <div class="input-wrap"><input id="withdrawAmount" type="text" inputmode="decimal" placeholder="0.00005" autocomplete="off" aria-describedby="withdrawHint" required><span>ETH</span></div>
+              <small id="withdrawHint">ถอนได้ไม่เกินยอดเงินฝากที่แสดงด้านบน</small>
+              <button type="submit" id="withdrawButton" class="btn btn-action btn-withdraw" disabled>ถอนเงิน <span aria-hidden="true">↗</span></button>
+            </form>
+          </article>
+        </div>
+        <div id="statusMessage" class="status-message hidden" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="details-grid" aria-label="ข้อมูลเพิ่มเติม">
+        <article class="detail-card">
+          <div class="section-heading compact"><div><span class="section-kicker">ACTIVITY</span><h2>รายการในรอบนี้</h2></div></div>
+          <div id="activityList" class="activity-list">
+            <div class="empty-state"><span class="empty-icon" aria-hidden="true">↗</span><strong>ยังไม่มีรายการ</strong><p>รายการฝากและถอนที่ทำจากหน้านี้จะแสดงที่นี่</p></div>
+          </div>
+          <p class="detail-note">แสดงเฉพาะธุรกรรมที่ทำในหน้าเว็บระหว่างการเปิดหน้านี้ ไม่ใช่ประวัติ Blockchain ทั้งหมด</p>
+        </article>
+        <div class="detail-stack">
+          <article class="detail-card">
+            <span class="section-kicker">SMART CONTRACT</span><h2>Contract Information</h2>
+            <div class="info-pair"><span>Contract</span><strong>Bank.sol</strong></div>
+            <div class="info-pair"><span>Network</span><strong>Sepolia · 11155111</strong></div>
+            <div class="address-box"><code id="contractAddress">0xF31d37086883F2479d99DBA16A428c20223F8fB1</code><button type="button" class="copy-btn" id="copyContractButton" aria-label="คัดลอก Contract Address">⧉</button></div>
+            <a class="external-link" href="https://sepolia.etherscan.io/address/0xF31d37086883F2479d99DBA16A428c20223F8fB1#code" target="_blank" rel="noopener noreferrer">ดู Smart Contract บน Etherscan ↗</a>
+          </article>
+          <article class="detail-card student-card">
+            <span class="section-kicker">SUBMITTED BY</span><h2>ข้อมูลผู้จัดทำ</h2>
+            <!-- REQUIRED: Replace the two placeholder values below with your actual student ID and full name before submitting. -->
+            <div class="info-pair"><span>รหัสนักศึกษา</span><strong id="studentId">กรุณากรอกข้อมูล</strong></div>
+            <div class="info-pair"><span>ชื่อ-นามสกุล</span><strong id="studentName">กรุณากรอกข้อมูล</strong></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>© 2026 Sepolia Bank · Educational DApp</span><span>สร้างเพื่อการเรียนรู้ · ไม่ใช่ธนาคารหรือบริการทางการเงินจริง</span></footer>
+  </div>
+</body>
+</html>
