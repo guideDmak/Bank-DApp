@@ -18,6 +18,13 @@ let contract = null;
 let account = null;
 let busy = false;
 let currentChain = null;
+let connectionAttempt = 0;
+let disconnecting = false;
+// Remember a deliberate logout across page refreshes in the current tab.
+let manuallyDisconnected = (() => {
+  try { return sessionStorage.getItem("bankDappDisconnected") === "1"; }
+  catch { return false; }
+})();
 
 function shorten(address) {
   return address ? address.slice(0, 6) + "…" + address.slice(-4) : "—";
@@ -49,7 +56,9 @@ function setControls() {
   el("depositButton").disabled = !ready || busy;
   el("withdrawButton").disabled = !ready || busy;
   el("refreshButton").disabled = !ready || busy;
-  el("connectButton").disabled = busy;
+  el("connectButton").disabled = busy || disconnecting;
+  el("disconnectButton").disabled = busy || disconnecting;
+  el("disconnectButton").classList.toggle("hidden", !account);
   el("switchNetworkButton").classList.toggle("hidden", !(account && currentChain !== SEPOLIA_CHAIN_ID));
 }
 function disconnectState(message = "ยังไม่ได้เชื่อมต่อกระเป๋าเงิน") {
@@ -65,6 +74,8 @@ function disconnectState(message = "ยังไม่ได้เชื่อ�
   el("networkStatus").textContent = "NETWORK · —";
   el("bankBalance").textContent = "—";
   el("walletBalance").textContent = "—";
+  el("bankBalance").removeAttribute("title");
+  el("walletBalance").removeAttribute("title");
   setControls();
 }
 async function refreshBalances() {
@@ -97,6 +108,13 @@ function formatWalletEth(amountWei) {
   return "≈ " + whole + "." + visible;
 }
 async function connectWallet(requestAccounts = true) {
+  // A deliberate logout must not be undone by MetaMask events or reloading the page.
+  if (manuallyDisconnected && !requestAccounts) return;
+  if (disconnecting) return;
+  if (requestAccounts) {
+    manuallyDisconnected = false;
+    try { sessionStorage.removeItem("bankDappDisconnected"); } catch {}
+  }
   if (!window.ethereum) {
     setStatus("ไม่พบกระเป๋าเงินที่รองรับ Ethereum กรุณาเปิดเว็บใน Browser ที่ติดตั้ง MetaMask", "error");
     return;
@@ -105,18 +123,24 @@ async function connectWallet(requestAccounts = true) {
     setStatus("โหลด ethers.js ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตและรีเฟรชหน้า", "error");
     return;
   }
+  const thisAttempt = ++connectionAttempt;
   try {
-    provider = new ethers.BrowserProvider(window.ethereum);
-    const accounts = await provider.send(requestAccounts ? "eth_requestAccounts" : "eth_accounts", []);
+    const nextProvider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await nextProvider.send(requestAccounts ? "eth_requestAccounts" : "eth_accounts", []);
+    if (thisAttempt !== connectionAttempt || manuallyDisconnected) return;
     if (!accounts.length) {
       disconnectState();
       if (requestAccounts) setStatus("ยังไม่ได้อนุญาตให้เว็บเข้าถึงบัญชี", "error");
       return;
     }
-    signer = await provider.getSigner();
-    account = await signer.getAddress();
-    const network = await provider.getNetwork();
-    currentChain = network.chainId;
+    const nextSigner = await nextProvider.getSigner();
+    const nextAccount = await nextSigner.getAddress();
+    const nextNetwork = await nextProvider.getNetwork();
+    if (thisAttempt !== connectionAttempt || manuallyDisconnected) return;
+    provider = nextProvider;
+    signer = nextSigner;
+    account = nextAccount;
+    currentChain = nextNetwork.chainId;
     contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
     el("walletAddress").textContent = account;
     el("connectButtonText").textContent = shorten(account);
@@ -131,11 +155,40 @@ async function connectWallet(requestAccounts = true) {
       el("connectionDot").className = "connection-dot connected";
       el("connectionStatus").textContent = "เชื่อมต่อกระเป๋าเงินแล้ว";
       await refreshBalances();
+      if (thisAttempt !== connectionAttempt || manuallyDisconnected) return;
       setStatus("พร้อมใช้งาน Bank DApp บน Sepolia");
     }
   } catch (error) {
-    setStatus(errorText(error), "error");
+    if (thisAttempt === connectionAttempt && !manuallyDisconnected) setStatus(errorText(error), "error");
   } finally {
+    if (thisAttempt === connectionAttempt) setControls();
+  }
+}
+
+async function disconnectWallet() {
+  if (busy || disconnecting) return;
+  disconnecting = true;
+  manuallyDisconnected = true;
+  ++connectionAttempt; // Cancel any outstanding connect attempt.
+  try { sessionStorage.setItem("bankDappDisconnected", "1"); } catch {}
+  disconnectState("ตัดการเชื่อมต่อเว็บไซต์แล้ว");
+  el("depositAmount").value = "";
+  el("withdrawAmount").value = "";
+  setStatus("ตัดการเชื่อมต่อจาก Bank DApp แล้ว", "success");
+  // MetaMask-compatible providers can revoke this site's eth_accounts permission.
+  // If unsupported or declined, the website still stays logged out locally.
+  try {
+    if (window.ethereum && typeof window.ethereum.request === "function") {
+      await window.ethereum.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }]
+      });
+      setStatus("ตัดการเชื่อมต่อและถอนสิทธิ์เข้าถึงบัญชีจาก MetaMask แล้ว", "success");
+    }
+  } catch {
+    setStatus("ออกจาก Bank DApp แล้ว หากต้องการถอนสิทธิ์เว็บไซต์ใน MetaMask ด้วย ให้เปิด MetaMask → Dapp connections แล้วเลือก Disconnect");
+  } finally {
+    disconnecting = false;
     setControls();
   }
 }
@@ -236,6 +289,7 @@ async function runTransaction(kind) {
   }
 }
 el("connectButton").addEventListener("click", () => connectWallet(true));
+el("disconnectButton").addEventListener("click", disconnectWallet);
 el("switchNetworkButton").addEventListener("click", switchNetwork);
 el("refreshButton").addEventListener("click", async () => {
   try { await refreshBalances(); setStatus("อัปเดตยอดเงินล่าสุดแล้ว"); }
@@ -249,14 +303,16 @@ el("copyContractButton").addEventListener("click", async () => {
 });
 if (window.ethereum) {
   window.ethereum.on("accountsChanged", (accounts) => {
+    if (manuallyDisconnected) return;
     if (!accounts.length) disconnectState();
-    else if (!busy) connectWallet(false);
+    else if (!busy && !disconnecting) connectWallet(false);
     else setStatus("กระเป๋าเงินเปลี่ยนระหว่างธุรกรรม กรุณาตรวจสอบผลบน Etherscan", "error");
   });
   window.ethereum.on("chainChanged", () => {
-    if (!busy) connectWallet(false);
-    else setStatus("เครือข่ายเปลี่ยนระหว่างธุรกรรม กรุณาตรวจสอบผลบน Etherscan", "error");
+    if (manuallyDisconnected) return;
+    if (!busy && !disconnecting) connectWallet(false);
+    else if (busy) setStatus("เครือข่ายเปลี่ยนระหว่างธุรกรรม กรุณาตรวจสอบผลบน Etherscan", "error");
   });
 }
 disconnectState();
-if (window.ethereum && window.ethers) connectWallet(false);
+if (!manuallyDisconnected && window.ethereum && window.ethers) connectWallet(false);
