@@ -5,3 +5,9 @@
 .nav-author-text strong{font-size:13px;font-weight:500}
 @media(max-width:850px){.nav-author{margin:0 8px}.nav-author-text strong{font-size:12px}}
 @media(max-width:680px){.topbar{height:auto;min-height:92px;flex-wrap:wrap;padding:12px 0;gap:9px 6px}.brand{order:1}.topbar-actions{order:2;margin-left:auto}.nav-author{order:3;width:100%;margin:0;padding:4px 0 0 0}.nav-author-text{white-space:normal}}
+
+/* Wallet disconnect action */
+.btn-disconnect{padding:12px 14px;color:#f6c6d4;background:#40283a;border:1px solid #76536d;white-space:nowrap;font-size:12px}
+.btn-disconnect:not(:disabled):hover{background:#593349}
+@media(max-width:850px){.topbar-actions{flex-wrap:wrap;justify-content:flex-end}.btn-disconnect{padding:10px 12px}}
+@media(max-width:680px){.btn-disconnect{font-size:11px;padding:9px 11px}}
